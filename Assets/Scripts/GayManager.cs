@@ -38,7 +38,6 @@ public class GayManager : MonoBehaviour
         ShowSelectionScreen();
     }
 
-    // ── Pantalla de selección ────────────────────────────────────────────────
 
     void ShowSelectionScreen()
     {
@@ -77,7 +76,6 @@ public class GayManager : MonoBehaviour
             Invoke(nameof(MachinePlay), 0.5f);
     }
 
-    // ── Lógica de juego ──────────────────────────────────────────────────────
 
     void ResetBoard()
     {
@@ -100,7 +98,7 @@ public class GayManager : MonoBehaviour
 
         if (CheckWin(playerSymbol))
         {
-            statusText.text = "¡Ganaste! 🎉";
+            statusText.text = "¡Ganaste!";
             gameOver = true;
             DisableAllTiles();
             return;
@@ -166,41 +164,70 @@ public class GayManager : MonoBehaviour
         statusText.text = playerSymbol == 1 ? "Tu turno (X)" : "Tu turno (O)";
     }
 
+
     // ── Minimax ──────────────────────────────────────────────────────────────
 
+    // El algoritmo Minimax explora recursivamente todos los posibles movimientos
+    // futuros del tablero para elegir el más favorable para la máquina.
+    // 'isMaximizing' indica si es el turno de maximizar (máquina) o minimizar (jugador).
+    // 'depth' rastrea la profundidad de la recursión para premiar victorias rápidas.
     int Minimax(bool isMaximizing, int depth)
     {
+        // Casos base: se evalúa el estado actual del tablero antes de seguir explorando.
+        // Si la máquina ya ganó, devuelve puntuación positiva (mejor cuanto antes ocurra).
         if (CheckWin(machineSymbol)) return 10 - depth;
+        // Si el jugador ya ganó, devuelve puntuación negativa (peor cuanto antes ocurra).
         if (CheckWin(playerSymbol)) return depth - 10;
+        // Si el tablero está lleno sin ganador, es empate: puntuación neutra.
         if (IsBoardFull()) return 0;
 
         if (isMaximizing)
         {
+            // Turno de la MÁQUINA: quiere maximizar su puntuación.
+            // Empieza con el peor valor posible para ir superándolo.
             int best = int.MinValue;
+
             foreach (var node in map)
             {
-                if (node.TileValue != 0) continue;
+                if (node.TileValue != 0) continue; // Solo casillas vacías
+
+                // Simula colocar la ficha de la máquina en esta casilla
                 node.TileValue = machineSymbol;
+
+                // Llama recursivamente asumiendo que ahora toca minimizar (jugador)
+                // y se queda con la puntuación más alta encontrada
                 best = Mathf.Max(best, Minimax(false, depth + 1));
+
+                // Deshace el movimiento simulado (backtracking)
                 node.TileValue = 0;
             }
             return best;
         }
         else
         {
+            // Turno del JUGADOR: Minimax asume que jugará de forma óptima,
+            // es decir, intentará minimizar la puntuación de la máquina.
+            // Empieza con el mejor valor posible para ir reduciéndolo.
             int best = int.MaxValue;
+
             foreach (var node in map)
             {
-                if (node.TileValue != 0) continue;
+                if (node.TileValue != 0) continue; // Solo casillas vacías
+
+                // Simula colocar la ficha del jugador en esta casilla
                 node.TileValue = playerSymbol;
+
+                // Llama recursivamente asumiendo que ahora toca maximizar (máquina)
+                // y se queda con la puntuación más baja encontrada
                 best = Mathf.Min(best, Minimax(true, depth + 1));
+
+                // Deshace el movimiento simulado (backtracking)
                 node.TileValue = 0;
             }
             return best;
         }
     }
 
-    // ── Utilidades ───────────────────────────────────────────────────────────
 
     bool CheckWin(int symbol)
     {
@@ -240,7 +267,6 @@ public class GayManager : MonoBehaviour
         return null;
     }
 
-    // ── Restart ──────────────────────────────────────────────────────────────
 
     public void Restart()
     {
