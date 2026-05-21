@@ -1,56 +1,32 @@
-using System.Collections;
-using System.Collections.Generic;
-using System.Drawing;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.UI;
 
-public class Node
+public class Node : MonoBehaviour
 {
-    public int EValue { get; set; }
-    public int Team { get; set; }
-    public Node Parent { get; set; }
-    public int Alpha { get; set; }
-    public int Beta { get; set; }
-    public int Value { get; set; }
-    public Stack<Node> NodeChildren { get; set; }
-    public int[,] MatrixNode {  get; set; } 
-    public Node BestChild { get; set; }
-    public int X { get; set; }
-    public int Y { get; set; }
-    public bool Pruned { get; set; }
-    public Node(Node parent, int team, int alpha, int beta, int x, int y, int[,]matrixNode)
+    // 0 empty, 1 player, -1 machine
+
+    public int TileValue;
+
+    public int index;
+
+    public Text text;
+
+    public void UpdateVisual()
     {
-        Team = team;
-        Parent = parent;
-        Alpha = alpha;
-        Beta = beta;
-        Value = -team * 2;
-        NodeChildren = new Stack<Node>();
-        MatrixNode = matrixNode;
-        X = x;
-        Y = y;
-        BuildAuxMatrix(this);
-        Pruned = false;
-        //DebugMatrix(MatrixNode);
+        if (TileValue == 1)
+            text.text = "X";
+        else if (TileValue == -1)
+            text.text = "O";
+        else
+            text.text = "";
     }
-    public void BuildAuxMatrix(Node node) 
+   
+    public void OnClick()
     {
-        if (node.Parent != null)
-        {
-            MatrixNode[node.Parent.X, node.Parent.Y] = -node.Parent.Team;
-            BuildAuxMatrix(node.Parent);
-        }
+        Debug.Log("Click en tile " + index);
+        GayManager.Instance.OnTileClicked(this);
     }
-    public void DebugMatrix(int[,] matrix)
-    {
-        string text = "";
-        for (int i = 0; i < 3; i++)
-        {
-            for (int j = 0; j < 3; j++)
-            {
-                text += matrix[i, j] + " ";
-            }
-            text += "\n";
-        }
-        Debug.Log(text);
-    }
+
+
 }
