@@ -1,181 +1,249 @@
-using UnityEngine;
+﻿using UnityEngine;
+using UnityEngine.UI;
 
 public class GayManager : MonoBehaviour
 {
     public static GayManager Instance;
-    public Node[] map = new Node[9];
 
-    public bool playerTurn = true;
+    [Header("Tiles")]
+    public Node[] map;
 
-    private void Awake()
+    [Header("Sprites")]
+    public Sprite spriteX;
+    public Sprite spriteO;
+
+    [Header("UI - Selection Screen")]
+    public GameObject selectionPanel;
+    public Button btnGoFirst;
+    public Button btnGoSecond;
+
+    [Header("UI - Game Screen")]
+    public GameObject gamePanel;
+    public Text statusText;
+    public Button restartButton;
+
+    // 1 = jugador, -1 = máquina
+    public int playerSymbol;
+    public int machineSymbol;
+    public bool playerTurn;
+    private bool gameOver;
+
+    void Awake()
     {
-
-        //singleton
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        Instance = this;
     }
 
-    public void Restart()
+    void Start()
     {
-        for (int i = 0; i < map.Length; i++)
+        ShowSelectionScreen();
+    }
+
+    // ── Pantalla de selección ────────────────────────────────────────────────
+
+    void ShowSelectionScreen()
+    {
+        selectionPanel.SetActive(true);
+        gamePanel.SetActive(false);
+
+        btnGoFirst.onClick.RemoveAllListeners();
+        btnGoSecond.onClick.RemoveAllListeners();
+        btnGoFirst.onClick.AddListener(() => StartGame(goFirst: true));
+        btnGoSecond.onClick.AddListener(() => StartGame(goFirst: false));
+    }
+
+    void StartGame(bool goFirst)
+    {
+        selectionPanel.SetActive(false);
+        gamePanel.SetActive(true);
+
+        if (goFirst)
         {
-            map[i].index = i;
-            map[i].TileValue = 0;
-            map[i].UpdateVisual();
+            playerSymbol = 1;   // X
+            machineSymbol = -1; // O
+            playerTurn = true;
+            statusText.text = "Tu turno (X)";
         }
-        playerTurn = true;
+        else
+        {
+            playerSymbol = -1;  // O
+            machineSymbol = 1;  // X
+            playerTurn = false;
+            statusText.text = "Turno de la máquina...";
+        }
+
+        ResetBoard();
+
+        if (!playerTurn)
+            Invoke(nameof(MachinePlay), 0.5f);
     }
 
-    public void OnTileClicked(Node tile)
+    // ── Lógica de juego ──────────────────────────────────────────────────────
+
+    void ResetBoard()
     {
-        //si no es el torn del player o la cel�la esta ocupada, no fa res
-        if (!playerTurn || tile.TileValue != 0) return;
+        gameOver = false;
+        foreach (var node in map)
+        {
+            node.TileValue = 0;
+            node.UpdateVisual();
+            node.SetInteractable(true);
+        }
+    }
 
-        //asigna el valor del player a la tile i actualitza el mapa
-        tile.TileValue = 1;
-        tile.UpdateVisual();
+    public void OnTileClicked(Node node)
+    {
+        if (!playerTurn || gameOver || node.TileValue != 0) return;
 
-        //si el joc no ha acabat, dona el torn a la ia
-        if (CheckGame()) return;
+        node.TileValue = playerSymbol;
+        node.UpdateVisual();
+        node.SetInteractable(false);
+
+        if (CheckWin(playerSymbol))
+        {
+            statusText.text = "¡Ganaste! 🎉";
+            gameOver = true;
+            DisableAllTiles();
+            return;
+        }
+
+        if (IsBoardFull())
+        {
+            statusText.text = "¡Empate!";
+            gameOver = true;
+            return;
+        }
 
         playerTurn = false;
-        Invoke(nameof(AITurn), 0.5f);
+        statusText.text = "Turno de la máquina...";
+        Invoke(nameof(MachinePlay), 0.6f);
     }
 
-    bool CheckGame()
+    void MachinePlay()
     {
-        //retorna si el joc a acabat de cualsevol forma o si encara hauria de continuar
-        int[] currentBoard = new int[9];
-        for (int i = 0; i < 9; i++) currentBoard[i] = map[i].TileValue;
+        if (gameOver) return;
 
-        int state = GetState(currentBoard);
-        if (state != 0)
+        int bestScore = int.MinValue;
+        Node bestNode = null;
+
+        foreach (var node in map)
         {
-            if (state == 1) Debug.Log("Guanya el jugador");
-            else if (state == -1) Debug.Log("Guanya la IA");
-            else if (state == 3) Debug.Log("Empat");
-            return true;
+            if (node.TileValue != 0) continue;
+
+            node.TileValue = machineSymbol;
+            int score = Minimax(false, 0);
+            node.TileValue = 0;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestNode = node;
+            }
+        }
+
+        if (bestNode != null)
+        {
+            bestNode.TileValue = machineSymbol;
+            bestNode.UpdateVisual();
+            bestNode.SetInteractable(false);
+        }
+
+        if (CheckWin(machineSymbol))
+        {
+            statusText.text = "¡La máquina gana!";
+            gameOver = true;
+            DisableAllTiles();
+            return;
+        }
+
+        if (IsBoardFull())
+        {
+            statusText.text = "¡Empate!";
+            gameOver = true;
+            return;
+        }
+
+        playerTurn = true;
+        statusText.text = playerSymbol == 1 ? "Tu turno (X)" : "Tu turno (O)";
+    }
+
+    // ── Minimax ──────────────────────────────────────────────────────────────
+
+    int Minimax(bool isMaximizing, int depth)
+    {
+        if (CheckWin(machineSymbol)) return 10 - depth;
+        if (CheckWin(playerSymbol)) return depth - 10;
+        if (IsBoardFull()) return 0;
+
+        if (isMaximizing)
+        {
+            int best = int.MinValue;
+            foreach (var node in map)
+            {
+                if (node.TileValue != 0) continue;
+                node.TileValue = machineSymbol;
+                best = Mathf.Max(best, Minimax(false, depth + 1));
+                node.TileValue = 0;
+            }
+            return best;
+        }
+        else
+        {
+            int best = int.MaxValue;
+            foreach (var node in map)
+            {
+                if (node.TileValue != 0) continue;
+                node.TileValue = playerSymbol;
+                best = Mathf.Min(best, Minimax(true, depth + 1));
+                node.TileValue = 0;
+            }
+            return best;
+        }
+    }
+
+    // ── Utilidades ───────────────────────────────────────────────────────────
+
+    bool CheckWin(int symbol)
+    {
+        int[,] lines = {
+            {0,1,2}, {3,4,5}, {6,7,8},   // filas
+            {0,3,6}, {1,4,7}, {2,5,8},   // columnas
+            {0,4,8}, {2,4,6}              // diagonales
+        };
+
+        for (int i = 0; i < lines.GetLength(0); i++)
+        {
+            if (map[lines[i, 0]].TileValue == symbol &&
+                map[lines[i, 1]].TileValue == symbol &&
+                map[lines[i, 2]].TileValue == symbol)
+                return true;
         }
         return false;
     }
 
-   
-    public float MinMax(int[] board, int depth, float alpha, float beta, bool isMaximizing)
+    bool IsBoardFull()
     {
-        //si hi ha un guanyador o hi ha un empat es retorna el estat 
-        int state = GetState(board);
-        if (state != 0) return (state == 3) ? 0 : state;
-
-        //torns hipotetics del player
-        if (isMaximizing)
-        {
-            float bestEval = -Mathf.Infinity;
-            //per cada cel�la lliure mira totes les posibilitats de moviments
-            for (int i = 0; i < 9; i++)
-            {
-                if (board[i] == 0)
-                {
-                    //asumeix que el jugador fa click en una cel�la, valida i torna al estat original
-                    board[i] = 1;
-                    float eval = MinMax(board, depth - 1, alpha, beta, false);
-                    board[i] = 0;
-
-                    //si es dona condicio de poda deixa de evaluar la resta de casos
-                    bestEval = Mathf.Max(bestEval, eval);
-                    alpha = Mathf.Max(alpha, eval);
-
-                    if (beta <= alpha) break;
-                }
-            }
-            return bestEval;
-        }
-        else
-        {
-            //el mateix que adalt pero en el torn de la ia
-            float bestEval = Mathf.Infinity;
-            for (int i = 0; i < 9; i++)
-            {
-                if (board[i] == 0)
-                {
-                    board[i] = -1;
-                    float eval = MinMax(board, depth - 1, alpha, beta, true);
-                    board[i] = 0;
-
-                    bestEval = Mathf.Min(bestEval, eval);
-                    beta = Mathf.Min(beta, eval);
-
-                    
-                    if (beta <= alpha) break;
-                }
-            }
-            return bestEval;
-        }
+        foreach (var node in map)
+            if (node.TileValue == 0) return false;
+        return true;
     }
 
-    void AITurn()
+    void DisableAllTiles()
     {
-        int bestMove = -1;
-        float bestValue = Mathf.Infinity;
-
-        //fa una copia del mapa pero amb el valor numeric de les cel�les
-        int[] currentBoard = new int[9];
-        for (int i = 0; i < 9; i++) currentBoard[i] = map[i].TileValue;
-
-
-        //mira les posibilitats de moviments d'entre les cel�les lliures i troba la mes optima
-        for (int i = 0; i < 9; i++)
-        {
-            if (currentBoard[i] == 0)
-            {
-                currentBoard[i] = -1;
-                
-                float moveValue = MinMax(currentBoard, 9, -Mathf.Infinity, Mathf.Infinity, true);
-                currentBoard[i] = 0;
-
-                if (moveValue < bestValue)
-                {
-                    bestValue = moveValue;
-                    bestMove = i;
-                }
-            }
-        }
-
-        //si troba un bon moviment marca la cel�la i actualitza el mapa
-        if (bestMove != -1)
-        {
-            map[bestMove].TileValue = -1;
-            map[bestMove].UpdateVisual();
-        }
-
-        //com abans, si el joc no ha acabat pasa el torn
-        if (!CheckGame()) playerTurn = true;
+        foreach (var node in map)
+            node.SetInteractable(false);
     }
 
-    public int GetState(int[] mapState)
+    public Sprite GetSprite(int value)
     {
-        //retorna l'estat del joc 1 -> guanya player, 0 -> joc encara segueix, -1 -> guanya ia, 3 -> empat
+        if (value == 1) return spriteX;
+        if (value == -1) return spriteO;
+        return null;
+    }
 
-        for (int i = 0; i < 3; i++)
-        {
-            //files
-            if (mapState[i * 3] != 0 && mapState[i * 3] == mapState[i * 3 + 1] && mapState[i * 3] == mapState[i * 3 + 2])
-                return mapState[i * 3];
-            //columnes
-            if (mapState[i] != 0 && mapState[i] == mapState[i + 3] && mapState[i] == mapState[i + 6])
-                return mapState[i];
-        }
+    // ── Restart ──────────────────────────────────────────────────────────────
 
-        //diagonals
-        if (mapState[4] != 0)
-        {
-            if (mapState[0] == mapState[4] && mapState[4] == mapState[8]) return mapState[4];
-            if (mapState[2] == mapState[4] && mapState[4] == mapState[6]) return mapState[4];
-        }
-
-        //si encara queden cel�les lliures i no ha retornat cap venc�edor abans encara segueix el joc
-        foreach (int val in mapState) if (val == 0) return 0;
-
-        //si no es dona cap condicio previa es un empat
-        return 3;
+    public void Restart()
+    {
+        ShowSelectionScreen();
     }
 }
