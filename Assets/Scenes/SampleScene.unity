@@ -1947,7 +1947,7 @@ MonoBehaviour:
   TileValue: 0
   index: 0
   tileImage: {fileID: 1477438390}
-  button: {fileID: 1233215274}
+  button: {fileID: 1477438389}
 --- !u!1 &1524833634
 GameObject:
   m_ObjectHideFlags: 0
